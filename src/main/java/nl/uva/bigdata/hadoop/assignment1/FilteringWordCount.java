@@ -13,6 +13,7 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 public class FilteringWordCount extends HadoopJob {
 
@@ -32,17 +33,33 @@ public class FilteringWordCount extends HadoopJob {
     }
 
     public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable> {
+        private final static IntWritable ONE = new IntWritable(1);
+        private final Text word = new Text();
 
         public void map(Object key, Text value, Mapper.Context context) throws IOException, InterruptedException {
-            // TODO Implement me
+            StringTokenizer tokenizer = new StringTokenizer(value.toString());
+            while (tokenizer.hasMoreTokens()) {
+                String nextToken = tokenizer.nextToken().replaceAll("[^a-zA-Z ]", "").toLowerCase();
+                if (!nextToken.equals("the") && !nextToken.equals("to")) {
+                    word.set(nextToken.toLowerCase());
+                    context.write(word, ONE);
+                }
+            }
         }
     }
 
+
     public static class IntSumReducer extends Reducer<Text,IntWritable,Text,IntWritable> {
+        private final IntWritable result = new IntWritable();
 
         public void reduce(Text key, Iterable<IntWritable> values, Context context)
                 throws IOException, InterruptedException {
-            // TODO Implement me
+            int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            result.set(sum);
+            context.write(key, result);
         }
     }
 }
