@@ -19,6 +19,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.StringTokenizer;
 
 public class AverageTemperaturePerMonth extends HadoopJob {
 
@@ -69,12 +70,14 @@ public class AverageTemperaturePerMonth extends HadoopJob {
 
     @Override
     public void write(DataOutput out) throws IOException {
-      // TODO Implement me
+      out.writeInt(this.year);
+      out.writeInt(this.month);
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
-      // TODO Implement me
+      this.year = in.readInt();
+      this.month = in.readInt();
     }
 
     @Override
@@ -104,17 +107,44 @@ public class AverageTemperaturePerMonth extends HadoopJob {
   }
 
   public static class MeasurementsMapper extends Mapper<Object, Text, YearMonthWritable, IntWritable> {
+    private final static IntWritable TEMP = new IntWritable(0);
+    private final YearMonthWritable YM = new YearMonthWritable();
 
     public void map(Object key, Text value, Mapper.Context context) throws IOException, InterruptedException {
-      // TODO Implement me
+      StringTokenizer tokenizer = new StringTokenizer(value.toString());
+
+      YM.setYear(Integer.parseInt(tokenizer.nextToken()));
+      YM.setMonth(Integer.parseInt(tokenizer.nextToken()));
+      Integer temp = Integer.parseInt(tokenizer.nextToken());
+      Double quality = Double.parseDouble(tokenizer.nextToken());
+
+      Double minQ = context.getConfiguration().getDouble("__UVA_minimumQuality", 0);
+
+      if(quality >= minQ){
+        TEMP.set(temp);
+        context.write(YM, TEMP);
+      }
+
+
     }
   }
 
   public static class AveragingReducer extends Reducer<YearMonthWritable,IntWritable,Text,NullWritable> {
 
+
+    private final Text outWord = new Text();
+
     public void reduce(YearMonthWritable yearMonth, Iterable<IntWritable> temperatures, Context context)
             throws IOException, InterruptedException {
-      // TODO Implement me
+      float sum = 0;
+      int n = 0;
+      for (IntWritable temp : temperatures) {
+        sum += temp.get();
+        n ++;
+      }
+      double avg = ((double)sum / (double)n);
+      outWord.set(yearMonth.year + "\t"+ yearMonth.month + "\t" + avg);
+      context.write(outWord, NullWritable.get());
     }
   }
 }
